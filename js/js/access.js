@@ -1,0 +1,109 @@
+// js/access.js
+import { getCurrentRole } from './auth.js';
+import { supabase } from './supabase-client.js';
+import { hasPermission, preloadPermissions } from './permissions.js';
+
+// ============================================================
+// CACHE PAGE ACCESS
+// ============================================================
+let pageAccessCache = null;
+let pageAccessLoading = null;
+
+export async function getAccessMap() {
+  if (pageAccessCache) return pageAccessCache;
+  if (pageAccessLoading) return pageAccessLoading;
+
+  pageAccessLoading = (async () => {
+    try {
+      const { data, error } = await supabase.from('page_access').select('page, role');
+      if (error) throw error;
+      const map = {};
+      (data || []).forEach(r => {
+        map[r.page] = map[r.page] || new Set();
+        map[r.page].add(r.role);
+      });
+      pageAccessCache = map;
+      return map;
+    } finally {
+      pageAccessLoading = null;
+    }
+  })();
+
+  return pageAccessLoading;
+}
+
+export async function canAccess(page, role = null) {
+  const r = role || await getCurrentRole();
+  if (!r) return false;
+  const map = await getAccessMap();
+  return map[page]?.has(r) === true;
+}
+
+export function resetPageAccessCache() {
+  pageAccessCache = null;
+  pageAccessLoading = null;
+}
+
+// ============================================================
+// GUARD HALAMAN
+// ============================================================
+export async function requirePageAccess(pageName) {
+  const role = await getCurrentRole();
+  if (!role) {
+    window.location.href = './index.html';
+    return null;
+  }
+  const allowed = await canAccess(pageName, role);
+  if (!allowed) {
+    const fallback = await defaultPageFor(role);
+    window.location.href = fallback && fallback !== pageName
+      ? `./${fallback}.html`
+      : './dashboard.html';
+    return null;
+  }
+  return role;
+}
+
+async function defaultPageFor(role) {
+  if (role === 'sales')  return 'sales-order';
+  if (role === 'kasir')  return 'kasir';
+  if (role === 'gudang') return 'inventory';
+  return 'dashboard';
+}
+
+// ============================================================
+// RENDER NAV (preload sekali, lalu instan)
+// ============================================================
+export async function renderNav(navEl, activePage = null) {
+  const role = await getCurrentRole();
+  if (!role) return;
+
+  // Preload paralel: permission + page_access
+  await Promise.all([preloadPermissions(), getAccessMap()]);
+
+  const menuDefs = [
+    { page: 'dashboard',   href: './dashboard.html',   label: 'Dashboard',    perm: 'dashboard.view' },
+    { page: 'sales-order', href: './sales-order.html', label: 'Sales Order',  perm: 'sales.order.view' },
+    { page: 'approval',    href: './approval.html',    label: 'Approval',     perm: 'sales.order.approve' },
+    { page: 'delivery',    href: './delivery.html',    label: 'Delivery',     perm: 'delivery.view' },
+    { page: 'piutang',     href: './piutang.html',     label: 'Piutang',      perm: 'historical.view' },
+    { page: 'hutang',      href: './hutang.html',      label: 'Hutang',       perm: 'finance.hutang.view' },  // ← BARU
+    { page: 'inventory',   href: './inventory.html',   label: 'Inventory',    perm: 'inventory.view' },
+    { page: 'kasir',       href: './kasir.html',       label: 'Kasir',        perm: 'kasir.view' },
+    { page: 'master',      href: './master.html',      label: 'Master',       perm: 'master.accounts.view' },
+    { page: 'journal',     href: './journal.html',     label: 'Jurnal',       perm: 'finance.journal.view' },
+    { page: 'reports',     href: './reports.html',     label: 'Laporan',      perm: 'reports.view' },
+    { page: 'settings',    href: './settings.html',    label: 'Pengaturan',   perm: 'admin.settings.view' }
+  ];
+
+  const allowed = [];
+  for (const m of menuDefs) {
+    const pageOk = await canAccess(m.page, role);
+    const permOk = await hasPermission(m.perm);
+    if (pageOk && permOk) allowed.push(m);
+  }
+
+  navEl.innerHTML = allowed.map(m =>
+    `<a href="${m.href}" class="${m.page === activePage ? 'active' : ''}">${m.label}</a>`
+  ).join('');
+}
