@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test RPC</title></head>
+<body>
+  <h1>Test get_my_permissions</h1>
+  <pre id="result">Memuat...</pre>
+  <script type="module">
+    import { supabase } from './js/supabase-client.js';
+    
+    const el = document.getElementById('result');
+    
+    // Cek session dulu
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      el.textContent = 'ERROR: Belum login. Buka aplikasi utama dulu, login, lalu kembali ke halaman ini.';
+    } else {
+      el.textContent = 'Login sebagai: ' + session.user.email + '\nMemanggil RPC...';
+      
+      const { data, error } = await supabase.rpc('get_my_permissions');
+      
+      if (error) {
+        el.textContent = 'ERROR: ' + JSON.stringify(error, null, 2);
+      } else {
+        el.textContent = 'SUKSES! Total permission: ' + (data?.length || 0) + '\n\n' + 
+                         JSON.stringify(data?.slice(0, 5), null, 2) + '\n...';
+      }
+    }
+  </script>
+</body>
+</html>
