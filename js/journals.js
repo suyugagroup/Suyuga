@@ -41,7 +41,6 @@ export async function createJournal({ journal_date, description, ref_no, lines, 
   }
   const journal_no = prefix + String(nextSeq).padStart(4, '0');
 
-  // Paksa created_by dari auth.uid() atau null
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData?.user?.id ?? null;
 
@@ -75,6 +74,27 @@ export async function createJournal({ journal_date, description, ref_no, lines, 
   return header;
 }
 
+export async function updateJournal(id, { journal_date, description, ref_no, lines, currency_code = 'IDR', exchange_rate = 1 }) {
+  const { error: dErr } = await supabase.from('journal_lines').delete().eq('journal_id', id);
+  if (dErr) throw dErr;
+
+  const { error: hErr } = await supabase
+    .from('journals').update({
+      journal_date, description, ref_no, currency_code, exchange_rate
+    }).eq('id', id);
+  if (hErr) throw hErr;
+
+  const rows = lines.map((l, i) => ({
+    journal_id: id, line_no: i + 1,
+    account_id: l.account_id, partner_id: l.partner_id || null,
+    debit: l.debit || 0, credit: l.credit || 0,
+    debit_base: l.debit || 0, credit_base: l.credit || 0,
+    memo: l.memo || null
+  }));
+  const { error: lErr } = await supabase.from('journal_lines').insert(rows);
+  if (lErr) throw lErr;
+}
+
 export async function deleteJournal(id) {
   const { error } = await supabase.from('journals')
     .update({ deleted_at: new Date().toISOString() }).eq('id', id);
@@ -88,9 +108,22 @@ export async function reverseJournal(id) {
   if (gErr) throw gErr;
 
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const { count } = await supabase.from('journals').select('*', { count: 'exact', head: true });
-  const seq = String((count || 0) + 1).padStart(4, '0');
-  const reversal_no = 'JV-' + today + '-' + seq + '-REV';
+  const prefix = 'JV-' + today + '-';
+
+  const { data: existing } = await supabase
+    .from('journals')
+    .select('journal_no')
+    .like('journal_no', prefix + '%')
+    .order('journal_no', { ascending: false })
+    .limit(1);
+
+  let nextSeq = 1;
+  if (existing && existing.length) {
+    const match = existing[0].journal_no.match(/-(\d+)(?:-REV)?$/);
+    if (match) nextSeq = parseInt(match[1], 10) + 1;
+  }
+
+  const reversal_no = prefix + String(nextSeq).padStart(4, '0') + '-REV';
 
   const { data: header, error: hErr } = await supabase
     .from('journals').insert({
@@ -102,7 +135,7 @@ export async function reverseJournal(id) {
       currency_code: original.currency_code,
       exchange_rate: original.exchange_rate,
       partner_id: original.partner_id,
-      created_by: session?.user?.id
+      created_by: session?.user?.id ?? null
     }).select().single();
   if (hErr) throw hErr;
 
