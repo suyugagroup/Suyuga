@@ -25,17 +25,40 @@ export async function getJournal(id) {
 export async function createJournal({ journal_date, description, ref_no, lines, currency_code = 'IDR', exchange_rate = 1 }) {
   const { data: { session } } = await supabase.auth.getSession();
   const today = new Date(journal_date).toISOString().slice(0, 10).replace(/-/g, '');
-  const { count } = await supabase.from('journals').select('*', { count: 'exact', head: true });
-  const seq = String((count || 0) + 1).padStart(4, '0');
-  const journal_no = 'JV-' + today + '-' + seq;
+  const prefix = 'JV-' + today + '-';
+
+  const { data: existing } = await supabase
+    .from('journals')
+    .select('journal_no')
+    .like('journal_no', prefix + '%')
+    .order('journal_no', { ascending: false })
+    .limit(1);
+
+  let nextSeq = 1;
+  if (existing && existing.length) {
+    const match = existing[0].journal_no.match(/-(\d+)(?:-REV)?$/);
+    if (match) nextSeq = parseInt(match[1], 10) + 1;
+  }
+  const journal_no = prefix + String(nextSeq).padStart(4, '0');
+
+  // Paksa created_by dari auth.uid() atau null
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id ?? null;
 
   const { data: header, error: hErr } = await supabase
     .from('journals').insert({
-      journal_no, journal_date, description, ref_no,
-      currency_code, exchange_rate,
-      created_by: session?.user?.id
+      journal_no,
+      journal_date,
+      description: description || 'Jurnal manual',
+      ref_no: ref_no || null,
+      currency_code: currency_code || 'IDR',
+      exchange_rate: exchange_rate || 1,
+      created_by: userId
     }).select().single();
-  if (hErr) throw hErr;
+  if (hErr) {
+    console.error('[createJournal] insert header error:', hErr);
+    throw hErr;
+  }
 
   const rows = lines.map((l, i) => ({
     journal_id: header.id, line_no: i + 1,
@@ -45,29 +68,11 @@ export async function createJournal({ journal_date, description, ref_no, lines, 
     memo: l.memo || null
   }));
   const { error: lErr } = await supabase.from('journal_lines').insert(rows);
-  if (lErr) throw lErr;
+  if (lErr) {
+    console.error('[createJournal] insert lines error:', lErr);
+    throw lErr;
+  }
   return header;
-}
-
-export async function updateJournal(id, { journal_date, description, ref_no, lines, currency_code = 'IDR', exchange_rate = 1 }) {
-  const { error: dErr } = await supabase.from('journal_lines').delete().eq('journal_id', id);
-  if (dErr) throw dErr;
-
-  const { error: hErr } = await supabase
-    .from('journals').update({
-      journal_date, description, ref_no, currency_code, exchange_rate
-    }).eq('id', id);
-  if (hErr) throw hErr;
-
-  const rows = lines.map((l, i) => ({
-    journal_id: id, line_no: i + 1,
-    account_id: l.account_id, partner_id: l.partner_id || null,
-    debit: l.debit || 0, credit: l.credit || 0,
-    debit_base: l.debit || 0, credit_base: l.credit || 0,
-    memo: l.memo || null
-  }));
-  const { error: lErr } = await supabase.from('journal_lines').insert(rows);
-  if (lErr) throw lErr;
 }
 
 export async function deleteJournal(id) {
