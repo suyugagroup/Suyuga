@@ -8,9 +8,9 @@ export async function listAccounts() {
   return data;
 }
 
-export async function createAccount({ code, name, type, normal_balance, parent_id = null }) {
+export async function createAccount({ code, name, type, normal_balance }) {
   const { data, error } = await supabase
-    .from('accounts').insert({ code, name, type, normal_balance, parent_id })
+    .from('accounts').insert({ code, name, type, normal_balance, is_active: true })
     .select().single();
   if (error) throw error;
   return data;

@@ -6,15 +6,20 @@ import { supabase } from './supabase-client.js';
 // ============================================================
 export async function listLockedPeriods() {
   const { data, error } = await supabase
-    .from('locked_periods')
+    .from('periods')
     .select(`
-      id, year, month, locked_at, notes,
+      id, period_year, period_month, is_locked, locked_at, notes,
       profiles!locked_by(email, full_name)
     `)
-    .order('year', { ascending: false })
-    .order('month', { ascending: false });
+    .eq('is_locked', true)
+    .order('period_year', { ascending: false })
+    .order('period_month', { ascending: false });
   if (error) throw error;
-  return data || [];
+  return (data || []).map(p => ({
+    ...p,
+    year: p.period_year,
+    month: p.period_month
+  }));
 }
 
 // ============================================================
@@ -23,13 +28,15 @@ export async function listLockedPeriods() {
 export async function lockPeriod(year, month, notes = null) {
   const { data: { session } } = await supabase.auth.getSession();
   const { data, error } = await supabase
-    .from('locked_periods')
-    .insert({
-      year,
-      month,
+    .from('periods')
+    .upsert({
+      period_year: year,
+      period_month: month,
+      is_locked: true,
+      locked_at: new Date().toISOString(),
       locked_by: session?.user?.id ?? null,
       notes
-    })
+    }, { onConflict: 'period_year,period_month' })
     .select()
     .single();
   if (error) throw error;
@@ -41,8 +48,8 @@ export async function lockPeriod(year, month, notes = null) {
 // ============================================================
 export async function unlockPeriod(id) {
   const { error } = await supabase
-    .from('locked_periods')
-    .delete()
+    .from('periods')
+    .update({ is_locked: false, locked_at: null, locked_by: null })
     .eq('id', id);
   if (error) throw error;
 }
@@ -52,13 +59,13 @@ export async function unlockPeriod(id) {
 // ============================================================
 export async function checkPeriodLocked(year, month) {
   const { data, error } = await supabase
-    .from('locked_periods')
-    .select('id')
-    .eq('year', year)
-    .eq('month', month)
+    .from('periods')
+    .select('id, is_locked')
+    .eq('period_year', year)
+    .eq('period_month', month)
     .maybeSingle();
   if (error) throw error;
-  return !!data;
+  return data?.is_locked === true;
 }
 
 // ============================================================

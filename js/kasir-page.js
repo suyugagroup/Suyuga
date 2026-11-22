@@ -2,14 +2,17 @@
 import { requireAuth, logout, getSetting } from './auth.js';
 import { renderNav, requirePageAccess } from './access.js';
 import { listItems } from './items.js';
-import { createCashSale, listCashSales } from './kasir.js';
+import { createCashSale, listCashSales, voidCashSale } from './kasir.js';
+import { hasPermission } from './permissions.js';
 import { supabase } from './supabase-client.js';
 
 const state = {
   items: [],
   itemsById: {},
   lineCount: 0,
-  ppnRate: 11
+  ppnRate: 11,
+  canCreate: false,
+  canVoid: false
 };
 
 function toast(msg, isError = false) {
@@ -35,6 +38,13 @@ function fmt(n) { return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); }
   document.getElementById('logoutBtn').addEventListener('click', logout);
   await renderNav(document.getElementById('mainNav'), 'kasir');
 
+  state.canCreate = await hasPermission('kasir.create');
+  state.canVoid   = await hasPermission('kasir.void');
+
+  if (!state.canCreate) {
+    document.getElementById('form-cash').style.display = 'none';
+  }
+
   const ppnStr = await getSetting('ppn_rate');
   state.ppnRate = Number(ppnStr) || 11;
 
@@ -43,11 +53,13 @@ function fmt(n) { return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); }
 
   document.querySelector('[name=cash_date]').value = new Date().toISOString().slice(0, 10);
 
-  document.getElementById('addLineBtn').addEventListener('click', () => addLine());
-  document.getElementById('resetBtn').addEventListener('click', resetForm);
-  document.getElementById('form-cash').addEventListener('submit', onSubmit);
+  if (state.canCreate) {
+    document.getElementById('addLineBtn').addEventListener('click', () => addLine());
+    document.getElementById('resetBtn').addEventListener('click', resetForm);
+    document.getElementById('form-cash').addEventListener('submit', onSubmit);
+    addLine();
+  }
 
-  addLine();
   await renderList();
 })();
 
@@ -127,12 +139,18 @@ async function onSubmit(e) {
     const lines = collectLines();
     if (lines.length === 0) throw new Error('Minimal 1 item');
 
-    const cashId = await createCashSale({
+    // Hitung grand total untuk paid_amount
+    const total = lines.reduce((s, l) => s + l.qty * l.unit_price, 0);
+    const grand = total * (1 + state.ppnRate / 100);
+
+    const result = await createCashSale({
       cash_date: f.cash_date.value,
       description: f.description.value.trim() || null,
-      lines
+      lines,
+      payment_method: 'cash',
+      paid_amount: grand
     });
-    toast(`✓ Transaksi tunai tersimpan (ID ${cashId})`);
+    toast(`✓ Transaksi ${result.sale_no} tersimpan (Grand: ${fmt(result.grand_total)})`);
     resetForm();
     state.items = await listItems();
     state.itemsById = Object.fromEntries(state.items.map(i => [i.id, i]));
@@ -154,21 +172,48 @@ async function renderList() {
       wrap.innerHTML = '<div style="color:#9ca3af;font-size:13px;">Belum ada transaksi.</div>';
       return;
     }
-    wrap.innerHTML = list.map(c => `
-      <div class="journal-list-item">
-        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-          <div>
-            <b>${esc(c.cash_no)}</b><br>
-            <span style="font-size:13px;">${esc(c.description || '—')}</span>
+    wrap.innerHTML = list.map(c => {
+      const statusBadge = c.status === 'void'
+        ? '<span style="background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:6px;">VOID</span>'
+        : '<span style="background:#d1fae5;color:#065f46;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:6px;">POSTED</span>';
+      const voidBtn = (state.canVoid && c.status === 'posted')
+        ? `<button class="btn btn-danger" style="padding:4px 10px;font-size:11px;margin-top:6px;" data-void="${c.id}" data-no="${esc(c.sale_no)}">Void</button>`
+        : '';
+      return `
+        <div class="journal-list-item">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <div>
+              <b>${esc(c.sale_no)}</b>${statusBadge}<br>
+              <span style="font-size:13px;">${esc(c.note || c.customer_name || '—')}</span>
+            </div>
+            <div style="text-align:right;font-size:13px;">
+              <div>${fmt(c.grand_total)}</div>
+              <div style="color:#6b7280;font-size:12px;">${c.cash_date}</div>
+            </div>
           </div>
-          <div style="text-align:right;font-size:13px;">
-            <div>${fmt(c.grand_total)}</div>
-            <div style="color:#6b7280;font-size:12px;">${c.cash_date}</div>
-          </div>
-        </div>
-      </div>
-    `).join('');
+          ${voidBtn}
+        </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('[data-void]').forEach(btn => {
+      btn.addEventListener('click', () => onVoid(Number(btn.dataset.void), btn.dataset.no));
+    });
   } catch (err) {
     wrap.innerHTML = `<div style="color:#b91c1c;font-size:13px;">${esc(err.message)}</div>`;
+  }
+}
+
+async function onVoid(saleId, saleNo) {
+  if (!state.canVoid) { toast('Tidak ada akses void', true); return; }
+  const reason = prompt(`Void transaksi ${saleNo}? Alasan:`);
+  if (!reason) return;
+  try {
+    await voidCashSale(saleId, reason);
+    toast(`✓ ${saleNo} di-void`);
+    state.items = await listItems();
+    state.itemsById = Object.fromEntries(state.items.map(i => [i.id, i]));
+    await renderList();
+  } catch (err) {
+    toast('Gagal: ' + (err.message || err), true);
   }
 }

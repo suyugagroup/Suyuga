@@ -58,15 +58,15 @@ function periodLabel(from, to) {
   await renderNav(document.getElementById('mainNav'), 'reports');
 
   // Muat permission
-  state.perms.export           = await hasPermission('reports.export');
-  state.perms.periodSet        = await hasPermission('reports.period.set');
-  state.perms.trialBalance     = await hasPermission('reports.trial_balance');
-  state.perms.cashflow         = await hasPermission('reports.cashflow');
-  state.perms.aging            = await hasPermission('reports.aging_piutang');
-  state.perms.agingHutang      = await hasPermission('finance.hutang.detail');
-  state.perms.salesPerformance = await hasPermission('reports.view');
-  state.perms.labaRugi         = await hasPermission('reports.laba_rugi');
-  state.perms.neraca           = await hasPermission('reports.neraca');
+  state.perms.export           = await hasPermission('reports.view');
+state.perms.periodSet        = await hasPermission('reports.view');
+state.perms.trialBalance     = await hasPermission('reports.view');
+state.perms.cashflow         = await hasPermission('reports.view');
+state.perms.aging            = await hasPermission('reports.aging_piutang');
+state.perms.agingHutang      = await hasPermission('reports.aging_hutang');
+state.perms.salesPerformance = await hasPermission('reports.view');
+state.perms.labaRugi         = await hasPermission('reports.view');
+state.perms.neraca           = await hasPermission('reports.view');
 
   if (!state.perms.export) {
     document.getElementById('exportCsv').style.display = 'none';
