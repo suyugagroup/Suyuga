@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login — Sanno Accounting</title>
+  <title>Login — Suyuga Accounting</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -44,7 +44,7 @@
 </head>
 <body>
   <div class="card">
-    <h1>Sanno Accounting</h1>
+    <h1>Suyuga Accounting</h1>
     <p class="sub">Masuk untuk melanjutkan</p>
 
     <div id="errorMsg" class="error"></div>
@@ -85,7 +85,7 @@
 
       try {
         let email = emailEl.value.trim();
-        if (email && !email.includes('@')) email = email + '@sanno.local';
+        if (email && !email.includes('@')) email = email + '@Suyuga.local';
         await login(email, passEl.value);
         window.location.href = './dashboard.html';
       } catch (err) {

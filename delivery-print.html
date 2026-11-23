@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cetak Delivery Order — Sanno Accounting</title>
+  <title>Cetak Delivery Order — Suyuga Accounting</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -422,7 +422,7 @@
         `;
 
         // Set title halaman untuk nama file PDF
-        document.title = `DO-${doData.do_no} — ${company.name || 'Sanno Accounting'}`;
+        document.title = `DO-${doData.do_no} — ${company.name || 'Suyuga Accounting'}`;
 
       } catch (err) {
         console.error('[delivery-print] error:', err);

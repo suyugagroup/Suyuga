@@ -3,18 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pengaturan — Sanno Accounting</title>
+  <title>Pengaturan — Suyuga Accounting</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>⚙️</text></svg>">
   <link rel="stylesheet" href="./css/style.css">
 </head>
 <body>
   <div class="container">
     <div class="topbar">
-      <h1>Pengaturan — Sanno Accounting</h1>
+      <h1>Pengaturan — Suyuga Accounting</h1>
       <button class="btn btn-danger" id="logoutBtn">Keluar</button>
     </div>
 
     <nav class="nav" id="mainNav"></nav>
+
+<script type="module">
+  import { getCurrentRole } from './js/auth.js';
+  (async () => {
+    const role = await getCurrentRole();
+    if (role !== 'admin' && role !== 'superadmin') {
+      // Sembunyikan semua tab kecuali yang boleh
+      document.querySelectorAll('.tabs button').forEach(btn => {
+        const tab = btn.dataset.tab;
+        const allowed = (tab === 'sys');  // non-admin cuma bisa lihat sistem? atau sembunyikan semua?
+        if (!allowed) btn.style.display = 'none';
+      });
+    }
+    // Admin: sembunyikan tab user? admin boleh lihat user (tanpa superadmin)
+    if (role === 'admin') {
+      // admin boleh lihat user tab — tidak perlu sembunyikan
+    }
+  })();
+</script>
+<script type="module">
+  import { getCurrentRole } from './js/auth.js';
+  (async () => {
+    const role = await getCurrentRole();
+    const adminOnlyTabs = ['users', 'permissions', 'periods', 'audit'];
+    if (role !== 'admin' && role !== 'superadmin') {
+      document.querySelectorAll('.tabs button').forEach(btn => {
+        if (adminOnlyTabs.includes(btn.dataset.tab)) btn.style.display = 'none';
+      });
+      // Sembunyikan juga tab sys (sistem) untuk non-admin
+      const sysBtn = document.querySelector('.tabs button[data-tab="sys"]');
+      if (sysBtn) sysBtn.style.display = 'none';
+    }
+  })();
+</script>
 
     <div class="tabs">
       <button data-tab="sys" class="active">Sistem</button>
@@ -70,8 +104,8 @@
             </div>
           </div>
           <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">
-            Email login otomatis: <code id="emailPreview">username@sanno.local</code>
-          </div>
+  Login dengan username: <code id="emailPreview">username</code>
+</div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary" id="createUserBtn">Buat User</button>
           </div>
@@ -148,7 +182,7 @@
           <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px,1fr));">
             <div class="form-row" style="grid-column: span 2;">
               <label>Nama Perusahaan <span style="color:#dc2626;">*</span></label>
-              <input name="name" placeholder="PT Sanno Jaya" required>
+              <input name="name" placeholder="PT Suyuga Jaya" required>
             </div>
             <div class="form-row" style="grid-column: span 2;">
               <label>Alamat</label>
@@ -221,7 +255,7 @@
             </div>
             <div class="form-row">
               <label>Atas Nama <span style="color:#dc2626;">*</span></label>
-              <input name="account_name" placeholder="PT Sanno Jaya" required>
+              <input name="account_name" placeholder="PT Suyuga Jaya" required>
             </div>
             <div class="form-row">
               <label>Cabang</label>
