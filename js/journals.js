@@ -119,9 +119,27 @@ export async function updateJournal(id, { journal_date, description, ref_no, lin
 }
 
 export async function deleteJournal(id) {
-  const { error } = await supabase.from('journals')
-    .update({ deleted_at: new Date().toISOString() }).eq('id', id);
-  if (error) throw error;
+  // 1) Ambil jurnal yang mau dihapus
+  const { data: original, error: gErr } = await supabase
+    .from('journals').select('journal_no, ref_no').eq('id', id).single();
+  if (gErr) throw gErr;
+
+  const now = new Date().toISOString();
+
+  // 2) Soft-delete jurnal asli
+  const { error: dErr } = await supabase
+    .from('journals').update({ deleted_at: now }).eq('id', id);
+  if (dErr) throw dErr;
+
+  // 3) Kalau jurnal ini punya reversal (journal_no + '-REV'), hapus juga
+  const reversalNo = original.journal_no + '-REV';
+  const { error: rErr } = await supabase
+    .from('journals').update({ deleted_at: now })
+    .eq('journal_no', reversalNo);
+  if (rErr) {
+    console.error('[deleteJournal] gagal hapus reversal:', rErr);
+    // tidak throw — jurnal asli sudah terhapus, reversal opsional
+  }
 }
 
 export async function reverseJournal(id) {
