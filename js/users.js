@@ -2,10 +2,18 @@
 import { supabase } from './supabase-client.js';
 
 export async function listUsers() {
-  const { data, error } = await supabase
-    .from('profiles')
+  const { data: { session } } = await supabase.auth.getSession();
+  const { data: profile } = await supabase
+    .from('profiles').select('role').eq('id', session.user.id).single();
+
+  let q = supabase.from('profiles')
     .select('id, email, full_name, role, is_active, created_at')
     .order('created_at', { ascending: false });
+
+  if (profile?.role === 'admin') {
+    q = q.neq('role', 'superadmin');
+  }
+  const { data, error } = await q;
   if (error) throw error;
   return data;
 }

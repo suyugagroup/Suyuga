@@ -47,16 +47,16 @@ export function resetRoleCache() {
 // ============================================================
 // AUTH
 // ============================================================
-export async function login(email, password) {
-  let em = String(email || '').trim().toLowerCase();
-  if (em && !em.includes('@')) em = em + '@sanno.local';
+export async function login(username, password) {
+  let em = String(username || '').trim().toLowerCase();
+  // Kalau tidak ada @, tambahkan @suyuga.local (internal)
+  if (em && !em.includes('@')) em = em + '@suyuga.local';
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: em,
     password: String(password || '').trim()
   });
   if (error) throw error;
-
   resetRoleCache();
   return data.user;
 }

@@ -27,7 +27,9 @@ const AUDIT_LIMIT = 50;
 const auditFilters = { action: '', entity: '', dateFrom: '', dateTo: '' };
 
 async function initAuditTab() {
-  auditCanView = await hasPermission('admin.audit.view');
+  const role = await getCurrentRole();
+auditCanView = (role === 'admin' || role === 'superadmin')
+            && await hasPermission('admin.audit.view');
   if (!auditCanView) {
     document.getElementById('tbody-audit').innerHTML =
       '<tr><td colspan="6" style="text-align:center;color:#b91c1c;">Tidak ada akses melihat audit log.</td></tr>';
@@ -269,7 +271,7 @@ let bankEditId = null;
   const usernameEl = document.querySelector('#form-new-user [name=username]');
   usernameEl.addEventListener('input', () => {
     const v = usernameEl.value.trim() || 'username';
-    document.getElementById('emailPreview').textContent = `${v}@sanno.local`;
+    document.getElementById('emailPreview').textContent = v;  // tampil username saja
   });
 
   // Load tab yang butuh data di awal
