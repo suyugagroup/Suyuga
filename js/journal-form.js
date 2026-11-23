@@ -315,7 +315,7 @@ async function renderJournals() {
     wrap.innerHTML = list.map(j => {
       const s = sumMap[j.id] || { d: 0, c: 0 };
       const cur = j.currency_code !== 'IDR' ? ` (${j.currency_code} @${j.exchange_rate})` : '';
-      const isReversal = j.journal_no && j.journal_no.endsWith('-REV');
+      const isReversal = (j.ref_no && j.ref_no.endsWith('-REV')) || (j.journal_no && j.journal_no.endsWith('-REV'));
       const badge = isReversal
         ? `<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:4px;font-size:11px;margin-left:6px;">REVERSAL</span>`
         : '';
