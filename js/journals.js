@@ -75,24 +75,47 @@ export async function createJournal({ journal_date, description, ref_no, lines, 
 }
 
 export async function updateJournal(id, { journal_date, description, ref_no, lines, currency_code = 'IDR', exchange_rate = 1 }) {
+  // Ambil data lama untuk fallback
+  const { data: old, error: gErr } = await supabase
+    .from('journals').select('*').eq('id', id).single();
+  if (gErr) throw gErr;
+
+  const payload = {
+    journal_date:  journal_date || old.journal_date,
+    description:   description || old.description || 'Jurnal manual',
+    ref_no:        ref_no !== undefined ? (ref_no || null) : old.ref_no,
+    currency_code: currency_code || old.currency_code || 'IDR',
+    exchange_rate: Number(exchange_rate) || Number(old.exchange_rate) || 1
+  };
+
+  console.log('[updateJournal] payload:', payload);
+
+  const { error: hErr } = await supabase
+    .from('journals').update(payload).eq('id', id);
+  if (hErr) {
+    console.error('[updateJournal] header error:', hErr, 'payload:', payload);
+    throw hErr;
+  }
+
+  // Hapus lines lama, insert baru
   const { error: dErr } = await supabase.from('journal_lines').delete().eq('journal_id', id);
   if (dErr) throw dErr;
 
-  const { error: hErr } = await supabase
-    .from('journals').update({
-      journal_date, description, ref_no, currency_code, exchange_rate
-    }).eq('id', id);
-  if (hErr) throw hErr;
-
   const rows = lines.map((l, i) => ({
     journal_id: id, line_no: i + 1,
-    account_id: l.account_id, partner_id: l.partner_id || null,
-    debit: l.debit || 0, credit: l.credit || 0,
-    debit_base: l.debit || 0, credit_base: l.credit || 0,
+    account_id: l.account_id,
+    partner_id: l.partner_id || null,
+    debit:       Number(l.debit)  || 0,
+    credit:      Number(l.credit) || 0,
+    debit_base:  Number(l.debit)  || 0,
+    credit_base: Number(l.credit) || 0,
     memo: l.memo || null
   }));
   const { error: lErr } = await supabase.from('journal_lines').insert(rows);
-  if (lErr) throw lErr;
+  if (lErr) {
+    console.error('[updateJournal] lines error:', lErr, 'rows:', rows);
+    throw lErr;
+  }
 }
 
 export async function deleteJournal(id) {
