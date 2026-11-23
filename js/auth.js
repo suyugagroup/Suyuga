@@ -1,6 +1,9 @@
 // js/auth.js
 import { supabase } from './supabase-client.js';
 
+// Domain internal untuk username tanpa @
+const INTERNAL_DOMAIN = '@suyuga.local';
+
 // ============================================================
 // CACHE ROLE
 // ============================================================
@@ -45,18 +48,28 @@ export function resetRoleCache() {
 }
 
 // ============================================================
-// AUTH
+// AUTH — LOGIN
 // ============================================================
-export async function login(username, password) {
-  let em = String(username || '').trim().toLowerCase();
-  // Kalau tidak ada @, tambahkan @suyuga.local (internal)
-  if (em && !em.includes('@')) em = em + '@suyuga.local';
+// Menerima:
+//   - "suyugagroup@gmail.com"  → login dengan email lengkap
+//   - "admin"                  → login dengan username (auto @suyuga.local)
+//   - "sales1"                 → login dengan username (auto @suyuga.local)
+// ============================================================
+export async function login(usernameOrEmail, password) {
+  let em = String(usernameOrEmail || '').trim().toLowerCase();
+  if (!em) throw new Error('Username/email wajib diisi');
+
+  // Kalau tidak ada @, anggap username → tambahkan domain internal
+  if (!em.includes('@')) {
+    em = em + INTERNAL_DOMAIN;
+  }
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: em,
     password: String(password || '').trim()
   });
   if (error) throw error;
+
   resetRoleCache();
   return data.user;
 }
