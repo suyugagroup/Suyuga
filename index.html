@@ -50,10 +50,12 @@
     <div id="errorMsg" class="error"></div>
 
     <form id="loginForm">
-      <label for="email">Username</label>
-      <input type="text" id="email" autocomplete="username" required
+      <label for="username">Username atau Email</label>
+      <input type="text" id="username" autocomplete="username" required
              placeholder="mis. admin atau nama@domain.com">
-      <div class="hint">Cukup ketik username. Domain internal otomatis ditambahkan.</div>
+      <div class="hint">
+        Ketik username (tanpa @) atau email lengkap.
+      </div>
 
       <label for="password">Password</label>
       <input type="password" id="password" autocomplete="current-password" required
@@ -66,11 +68,11 @@
   <script type="module">
     import { login } from './js/auth.js';
 
-    const form    = document.getElementById('loginForm');
-    const emailEl = document.getElementById('email');
-    const passEl  = document.getElementById('password');
-    const btn     = document.getElementById('loginBtn');
-    const errBox  = document.getElementById('errorMsg');
+    const form       = document.getElementById('loginForm');
+    const usernameEl = document.getElementById('username');
+    const passEl     = document.getElementById('password');
+    const btn        = document.getElementById('loginBtn');
+    const errBox     = document.getElementById('errorMsg');
 
     function showError(msg) {
       errBox.textContent = msg;
@@ -84,9 +86,9 @@
       btn.textContent = 'Memuat...';
 
       try {
-        let email = emailEl.value.trim();
-        if (email && !email.includes('@')) email = email + '@Suyuga.local';
-        await login(email, passEl.value);
+        // Kirim apa adanya — auth.js yang menambahkan domain kalau perlu
+        const usernameOrEmail = usernameEl.value.trim();
+        await login(usernameOrEmail, passEl.value);
         window.location.href = './dashboard.html';
       } catch (err) {
         const msg = (err.message || '').toLowerCase().includes('invalid')
