@@ -315,16 +315,13 @@ async function renderJournals() {
     wrap.innerHTML = list.map(j => {
       const s = sumMap[j.id] || { d: 0, c: 0 };
       const cur = j.currency_code !== 'IDR' ? ` (${j.currency_code} @${j.exchange_rate})` : '';
-      const isReversed = j.reversed_by !== null;
-      const isReversal = j.reversal_of !== null;
-      const badge = isReversed
-        ? `<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px;margin-left:6px;">REVERSED</span>`
-        : (isReversal
-          ? `<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:4px;font-size:11px;margin-left:6px;">REVERSAL</span>`
-          : '');
+      const isReversal = j.journal_no && j.journal_no.endsWith('-REV');
+      const badge = isReversal
+        ? `<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:4px;font-size:11px;margin-left:6px;">REVERSAL</span>`
+        : '';
 
-      const showEdit     = state.perms.edit     && !isReversed && !isReversal;
-      const showReversal = state.perms.reversal && !isReversed && !isReversal;
+      const showEdit     = state.perms.edit     && !isReversal;
+      const showReversal = state.perms.reversal && !isReversal;
       const showDelete   = state.perms.delete   && !isReversal;
 
       const buttons = [];
